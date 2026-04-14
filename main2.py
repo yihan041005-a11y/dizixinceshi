@@ -89,22 +89,42 @@ if "messages" not in st.session_state:
 if "processing" not in st.session_state:
     st.session_state.processing = False
 
-# --- 5. 强制交互遮罩层 (方案3核心) ---
+# --- 5. 强制交互遮罩层 (修复点击穿透版) ---
 if not st.session_state.activated:
-    st.markdown(f"""
-        <div class="overlay" id="overlay">
-            <h3>欢迎参加实验</h3>
-            <p>请确保手机静音开关已关闭</p>
-            <p style="font-size: 12px; color: #666;">(点击下方按钮以激活语音系统)</p>
-            <button class="start-btn" onclick="document.getElementById('overlay').style.display='none';">点击进入系统</button>
+    # 1. 创建全屏背景，但不再内部嵌套 HTML 按钮，而是留出位置
+    st.markdown("""
+        <div class="overlay">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="color: #333;">欢迎参加实验</h3>
+                <p style="color: #666;">请确保手机静音开关已关闭</p>
+                <p style="font-size: 14px; color: #888;">(点击下方绿色按钮激活系统)</p>
+            </div>
         </div>
+        <style>
+            /* 调整布局，让 Streamlit 按钮浮在最上层 */
+            .overlay {
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background-color: rgba(255,255,255,1);
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                z-index: 999; /* 稍微降低层级 */
+            }
+            /* 强制让 Streamlit 按钮的容器浮上来 */
+            .element-container:has(button[kind="primary"]) {
+                position: relative;
+                z-index: 1000 !important;
+            }
+        </style>
     """, unsafe_allow_html=True)
     
-    # 使用一个隐藏的 Streamlit 按钮来同步激活状态
-    if st.button("我已准备好（点击此处）", type="primary"):
-        st.session_state.activated = True
-        st.rerun()
-    st.stop() # 未点击前不渲染后续内容
+    # 2. 使用真正的 Streamlit 按钮来承载点击事件
+    # 放置在两列中间，模拟居中效果
+    _, col_mid, _ = st.columns([1, 2, 1])
+    with col_mid:
+        if st.button("点击进入系统", type="primary", use_container_width=True):
+            st.session_state.activated = True
+            st.rerun()
+            
+    st.stop() # 必须点完按钮才继续
 
 # --- 6. 渲染聊天历史 ---
 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
