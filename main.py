@@ -96,13 +96,13 @@ st.markdown('</div>', unsafe_allow_html=True)
 with st.container():
     st.markdown('<div class="fixed-footer">', unsafe_allow_html=True)
     col_sel, col_btn = st.columns([4, 1])
-    options = ["请点击选择一个安全问题进行咨询..."] + list(AUDIO_MAPPING.keys())
+    options = ["请点击选择一个问题进行咨询..."] + list(AUDIO_MAPPING.keys())
     selected_option = col_sel.selectbox("Q", options, label_visibility="collapsed")
     send_trigger = col_btn.button("发送", use_container_width=True, type="primary")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- 6. 核心逻辑：分步执行 ---
-if send_trigger and selected_option != "请点击选择一个安全问题进行咨询...":
+if send_trigger and selected_option != "请点击选择一个问题进行咨询...":
     st.session_state.messages.append({"role": "user", "content": selected_option})
     st.session_state.current_q = selected_option
     st.session_state.processing = True
