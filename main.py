@@ -4,19 +4,15 @@ import os
 import time
 
 # ========================================================
-# 实验员控制台 - 流程优化版
+# 实验员控制台 - 语音条播放版 (本地文件映射)
 # ========================================================
 
 # --- 1. 映射配置 ---
 AUDIO_MAPPING = {
-    "朗读《红楼梦》的书评":
-        r"audio/ElevenLabs_2026-04-14T07_27_55_低自信声音4_红楼梦_v3.mp3",
-     "朗读《三国演义》的书评":
-        r"audio/ElevenLabs_2026-04-14T07_11_53_低自信声音4_三国演义_v3.mp3",
-    "朗读《西游记》的书评":
-        r"audio/ElevenLabs_2026-04-14T07_43_00_低自信声音4_西游记_v3.mp3",
-    "朗读《水浒传》的书评":
-        r"audio/ElevenLabs_2026-04-14T08_02_01_低自信声音4_水浒传_v3.mp3"
+    "朗读《红楼梦》的书评": r"audio/ElevenLabs_2026-04-14T07_27_55_低自信声音4_红楼梦_v3.mp3",
+    "朗读《三国演义》的书评": r"audio/ElevenLabs_2026-04-14T07_11_53_低自信声音4_三国演义_v3.mp3",
+    "朗读《西游记》的书评": r"audio/ElevenLabs_2026-04-14T07_43_00_低自信声音4_西游记_v3.mp3",
+    "朗读《水浒传》的书评": r"audio/ElevenLabs_2026-04-14T08_02_01_低自信声音4_水浒传_v3.mp3"
 }
 
 SPECIFIC_RESPONSES = {
@@ -52,29 +48,15 @@ st.markdown("""
         background-color: #f7f7f7; padding: 20px;
         border-top: 1px solid #dcdcdc; z-index: 1000;
     }
-    audio { display: none; }
+    /* 让语音条在聊天框内宽度适中 */
+    section.main audio {
+        width: 100%;
+        max-width: 300px;
+        margin-top: 5px;
+    }
     </style>
     <div class="fixed-header">AI语音交互系统</div>
     """, unsafe_allow_html=True)
-
-
-# --- 3. 音频重置播放函数 ---
-def autoplay_audio(audio_bytes, msg_index):
-    b64 = base64.b64encode(audio_bytes).decode()
-    audio_html = f"""
-        <audio id="audio_{msg_index}" autoplay>
-            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-        </audio>
-        <script>
-            var allAudios = window.parent.document.querySelectorAll('audio');
-            allAudios.forEach(function(a) {{ a.pause(); a.currentTime = 0; }});
-            var audio = document.getElementById('audio_{msg_index}');
-            audio.currentTime = 0;
-            audio.play();
-        </script>
-    """
-    st.components.v1.html(audio_html, height=0)
-
 
 # 初始化状态
 if "messages" not in st.session_state:
@@ -82,17 +64,17 @@ if "messages" not in st.session_state:
 if "processing" not in st.session_state:
     st.session_state.processing = False
 
-# --- 4. 渲染聊天历史 ---
+# --- 3. 渲染聊天历史 ---
 st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
+        # 如果包含语音，渲染播放条
         if "audio" in msg:
-            if st.button(f"🔊 重复播放", key=f"rep_{i}"):
-                autoplay_audio(msg["audio"], i)
+            st.audio(msg["audio"], format="audio/mp3")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 5. 底部输入区 ---
+# --- 4. 底部输入区 ---
 with st.container():
     st.markdown('<div class="fixed-footer">', unsafe_allow_html=True)
     col_sel, col_btn = st.columns([4, 1])
@@ -101,7 +83,7 @@ with st.container():
     send_trigger = col_btn.button("发送", use_container_width=True, type="primary")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 6. 核心逻辑：分步执行 ---
+# --- 5. 核心逻辑 ---
 if send_trigger and selected_option != "请点击选择一个问题进行咨询...":
     st.session_state.messages.append({"role": "user", "content": selected_option})
     st.session_state.current_q = selected_option
@@ -109,21 +91,18 @@ if send_trigger and selected_option != "请点击选择一个问题进行咨询.
     st.rerun() 
 
 if st.session_state.processing:
-    # 模拟思考动画
     with st.chat_message("assistant"):
         thinking_placeholder = st.empty()
-        # 这里建议加一个 loading 动画增强视觉效果
         with thinking_placeholder.container():
             st.markdown("AI 正在思考中...")
-            st.spinner("")
-            time.sleep(3) 
+            with st.spinner(""):
+                time.sleep(1.5) # 稍微缩短等待时间，提升体验
     
     thinking_placeholder.empty()
     q = st.session_state.current_q
     path = AUDIO_MAPPING[q]
     text = SPECIFIC_RESPONSES[q]
 
-    # 关键：检查文件是否存在
     if os.path.exists(path):
         with open(path, "rb") as f:
             audio_data = f.read()
@@ -133,16 +112,8 @@ if st.session_state.processing:
             "content": text,
             "audio": audio_data
         })
-        # 必须在成功后再设为 False
         st.session_state.processing = False 
         st.rerun() 
     else:
-        # 如果找不到文件，显示红色报错并停止 processing
-        st.error(f"❌ 找不到音频文件！请确认 GitHub 仓库中 audio 文件夹内是否存在该文件，且文件名大小写一致。路径：{path}")
+        st.error(f"❌ 找不到音频文件：{path}")
         st.session_state.processing = False
-
-# 自动播放逻辑
-if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
-    last_idx = len(st.session_state.messages) - 1
-    if "audio" in st.session_state.messages[-1]:
-        autoplay_audio(st.session_state.messages[-1]["audio"], last_idx)
